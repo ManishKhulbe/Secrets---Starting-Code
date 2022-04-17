@@ -4,8 +4,10 @@ const express = require('express')
 const mongoose = require('mongoose');
 const ejs = require('ejs');
 var bodyParser = require('body-parser');
-var encrypt = require('mongoose-encryption');
+const bcrypt = require('bcrypt');
 const { listen } = require('express/lib/application');
+const { hash } = require('bcrypt');
+const saltRounds = 10;
 
 const app = express();
 app.use(express.json());
@@ -23,8 +25,6 @@ const userSchema =new mongoose.Schema({
     password : String
 })
 
-
-userSchema.plugin(encrypt,{secret : process.env.SECRET, encryptedFields : ['password']});
 const User = new mongoose.model('User', userSchema);
 
 app.get('/',function(req,res){
@@ -39,29 +39,41 @@ app.get('/register',(req,res)=>{
 })
 
 app.post('/register' ,(req,res)=>{
-const newUser = new User({
-    email : req.body.username,
-    password : req.body.password
+
+    bcrypt.hash(req.body.password, saltRounds,(err,hash)=>{
+        if(err) console.log(err);
+        const newUser = new User({
+            email : req.body.username,
+            password : hash
+        })
+        newUser.save((err,data)=>{
+            if(err) console.log(err);
+            else{
+                console.log(data);
+                res.render('secrets.ejs')
+            }
+        });
+        
+    })
 })
-console.log(req.body.username , req.body.password , req.body);
-newUser.save((err)=>{
-    if(err) console.log(err);
-    else{
-        res.render('secrets.ejs')
-    }
-});
-})
+
 
 app.post('/login',(req,res)=>{
     username = req.body.username 
-    password = req.body.password
+    password =  req.body.password
 
     User.find({email : username},(err,data)=>{
         if(err) console.log(err);
         else{
-            if(data[0].password === password){
-                res.render('secrets.ejs')
-            }
+            bcrypt.compare(password , data[0].password,(err,data)=>{
+                if(err) console.log(err);
+                else{
+                    if(data === true){
+                        res.render('secrets.ejs')
+                    }
+                }
+            })
+            
             console.log(data);
         }
     })
